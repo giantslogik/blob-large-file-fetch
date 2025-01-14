@@ -32,6 +32,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Needs Photo Library access for saving content , as well as uploading any content you choose to submit</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Needs Photo Library access for saving content , as well as uploading any content you choose to submit</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>UILaunchStoryboardName</key>

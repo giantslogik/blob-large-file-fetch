@@ -5,9 +5,13 @@
  * @format
  */
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import type {PropsWithChildren} from 'react';
 import {
+  Alert,
+  Button,
+  PermissionsAndroid,
+  Platform,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -16,14 +20,51 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
+import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 
 import {
   Colors,
-  DebugInstructions,
   Header,
-  LearnMoreLinks,
-  ReloadInstructions,
 } from 'react-native/Libraries/NewAppScreen';
+
+async function hasAndroidPermission() {
+  const getCheckPermissionPromise = () => {
+    if (Number(Platform.Version) >= 33) {
+      return Promise.all([
+        PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES),
+        PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO),
+      ]).then(
+        ([hasReadMediaImagesPermission, hasReadMediaVideoPermission]) =>
+          hasReadMediaImagesPermission && hasReadMediaVideoPermission,
+      );
+    } else {
+      return PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE);
+    }
+  };
+
+  const hasPermission = await getCheckPermissionPromise();
+  if (hasPermission) {
+    return true;
+  }
+  const getRequestPermissionPromise = () => {
+    if (Number(Platform.Version) >= 33) {
+      return PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
+        PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO,
+      ]).then(
+        (statuses) =>
+          statuses[PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES] ===
+            PermissionsAndroid.RESULTS.GRANTED &&
+          statuses[PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO] ===
+            PermissionsAndroid.RESULTS.GRANTED,
+      );
+    } else {
+      return PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE).then((status) => status === PermissionsAndroid.RESULTS.GRANTED);
+    }
+  };
+
+  return await getRequestPermissionPromise();
+}
 
 type SectionProps = PropsWithChildren<{
   title: string;
@@ -62,6 +103,31 @@ function App(): React.JSX.Element {
     backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
   };
 
+  const [loading, setLoading] = useState(false);
+  const onButton1 = useCallback( async ()=>{
+    setLoading(true);
+    if (Platform.OS === 'android' && !(await hasAndroidPermission())) {
+      Alert.alert('Don\'t have permissions');
+      return;
+    }
+    try{
+    const { edges } = await CameraRoll.getPhotos({ first: 1 ,assetType: 'Videos' });
+    var uri = edges[0].node.image.uri;
+    if (Platform.OS === 'ios' && uri.startsWith('ph:')){
+      uri = (await CameraRoll.iosGetImageDataById(uri)).node.image.filepath ?? uri;
+    }
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    Alert.alert('Succesfully loaded a file with length' + Math.round(blob.size / (1024 * 1024)) + 'MB');
+    }catch(e){
+      Alert.alert('Failed to load file' + e);
+    }
+    setLoading(false);
+  },[]);
+
+
+
+  //Based on the BlobModule testing code on https://github.com/expo/react-native-blob-test/blob/master/index.common.js
   return (
     <SafeAreaView style={backgroundStyle}>
       <StatusBar
@@ -77,19 +143,14 @@ function App(): React.JSX.Element {
             backgroundColor: isDarkMode ? Colors.black : Colors.white,
           }}>
           <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
+            You need a large video file, to test the blob + large file fetch.
           </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
+          <View style={styles.spacer} />
+          <Button onPress={onButton1} title={loading ?  'Loading.. please wait.' : 'Choose a Large file'} disabled={loading} />
+          <View style={styles.spacer} >
+            <Text style ={styles.smallfont}> Error was reproduced with a 442 MB .mp4 file (55seconds of 3840 × 2160 px Ultra HD video.) </Text>
+            <Text style={styles.highlight}> Use logcat to capture & view the underlying android error.</Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -113,6 +174,8 @@ const styles = StyleSheet.create({
   highlight: {
     fontWeight: '700',
   },
+  spacer: {paddingTop: 5},
+  smallfont: {fontSize:12, padding: 10},
 });
 
 export default App;

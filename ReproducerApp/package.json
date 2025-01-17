@@ -10,6 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@dr.pogodin/react-native-fs": "^2.30.3",
     "@react-native-camera-roll/camera-roll": "^7.9.0",
     "react": "18.3.1",
     "react-native": "0.76.6"
@@ -36,5 +37,6 @@
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "packageManager": "yarn@1.22.19+sha1.4ba7fc5c6e704fce2066ecbfb0b0d8976fe62447"
 }

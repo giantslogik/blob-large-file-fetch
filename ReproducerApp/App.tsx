@@ -10,6 +10,8 @@ import type {PropsWithChildren} from 'react';
 import {
   Alert,
   Button,
+  Dimensions,
+  Image,
   PermissionsAndroid,
   Platform,
   SafeAreaView,
@@ -26,6 +28,8 @@ import {
   Colors,
   Header,
 } from 'react-native/Libraries/NewAppScreen';
+
+import * as RNFS from '@dr.pogodin/react-native-fs';
 
 async function hasAndroidPermission() {
   const getCheckPermissionPromise = () => {
@@ -96,13 +100,24 @@ function Section({children, title}: SectionProps): React.JSX.Element {
   );
 }
 
+function blobToBase64(blob: Blob) {
+  return new Promise<string>((resolve, _) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+}
+
+const testFileType: 'Videos' | 'Photos' = 'Videos';
+const testFileURL = false;//when true convert content:// urls to file:// urls before hitting fetch
+
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
 
   const backgroundStyle = {
     backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
   };
-
+  const [base64Image, setBase64Image] = useState('');
   const [loading, setLoading] = useState(false);
   const onButton1 = useCallback( async ()=>{
     setLoading(true);
@@ -111,20 +126,28 @@ function App(): React.JSX.Element {
       return;
     }
     try{
-    const { edges } = await CameraRoll.getPhotos({ first: 1 ,assetType: 'Videos' });
+    const { edges } = await CameraRoll.getPhotos({ first: 1 ,assetType: testFileType });
     var uri = edges[0].node.image.uri;
     if (Platform.OS === 'ios' && uri.startsWith('ph:')){
       uri = (await CameraRoll.iosGetImageDataById(uri)).node.image.filepath ?? uri;
     }
+    if(testFileURL){
+      const res = await RNFS.stat(uri);
+      uri = `file://${res.originalFilepath}`;
+    }
+    console.log(uri);
     const response = await fetch(uri);
     const blob = await response.blob();
+
+    if(testFileType === 'Photos'){
+      setBase64Image(await blobToBase64(blob));
+    }
     Alert.alert('Succesfully loaded a file with length' + Math.round(blob.size / (1024 * 1024)) + 'MB');
     }catch(e){
       Alert.alert('Failed to load file' + e);
     }
     setLoading(false);
   },[]);
-
 
 
   //Based on the BlobModule testing code on https://github.com/expo/react-native-blob-test/blob/master/index.common.js
@@ -151,11 +174,13 @@ function App(): React.JSX.Element {
             <Text style ={styles.smallfont}> Error was reproduced with a 442 MB .mp4 file (55seconds of 3840 × 2160 px Ultra HD video.) </Text>
             <Text style={styles.highlight}> Use logcat to capture & view the underlying android error.</Text>
           </View>
+          <Image style={{width: Dimensions.get('window').width, height: 500 , resizeMode: 'cover'}} source={{uri: base64Image}}/>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   sectionContainer: {
